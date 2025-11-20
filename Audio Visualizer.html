@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Audio Visualizer – More Presets</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --glass: rgba(240,245,255,0.08);
+      --accentA: #61e4d7;
+      --accentB: #e8cfff;
+      --muted: rgba(255,255,255,0.85);
+    }
+    html,body{
+      height:100%; margin:0; font-family:Inter, system-ui, Arial, sans-serif;
+      background: linear-gradient(125deg,#5a026d 0%, #8a0e95 45%, #330433 100%);
+      color:var(--muted); overflow:hidden;
+    }
+    #visualizer{ position:absolute; inset:0; width:100%; height:100%; display:block; }
+
+    /* Topbar controls (kept) */
+    .topbar{
+      position: absolute; left: 16px; right: 16px; top: 14px; display:flex;
+      justify-content:space-between; align-items:center; gap:12px; z-index:60;
+      transition: opacity 220ms ease, transform 220ms ease;
+    }
+    .topbar.ui-hidden { opacity: 0; transform: translateY(-8px); pointer-events: none; }
+
+    .controls{
+      display:flex; gap:8px; align-items:center; background:var(--glass);
+      padding:8px; border-radius:14px; box-shadow: 0 8px 30px rgba(0,0,0,0.35);
+      backdrop-filter: blur(8px);
+    }
+    .controls.ui-hidden { opacity: 0; transform: translateY(-8px); pointer-events: none; }
+
+    .btn{
+      border:0; padding:10px 12px; border-radius:10px; cursor:pointer; font-weight:700;
+      background:transparent; color:var(--muted); display:inline-flex; gap:8px; align-items:center;
+    }
+    .btn.selected{ background:linear-gradient(90deg,var(--accentA),var(--accentB)); color:#071226; box-shadow:0 6px 26px rgba(36,20,60,0.35); transform: translateY(-2px); }
+
+    /* bottom center preset bar (new location) */
+    .preset-bottom {
+      position: absolute;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      z-index: 70;
+      display: flex;
+      gap: 10px;
+      padding: 8px;
+      border-radius: 14px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      backdrop-filter: blur(6px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    }
+    .preset {
+      border:0; padding:8px 12px; border-radius:12px; cursor:pointer;
+      color:var(--muted); font-weight:600; background:transparent;
+      transition: all .14s;
+    }
+    .preset.selected { background: linear-gradient(90deg, rgba(97,228,215,0.14), rgba(232,207,255,0.10)); color:#071226; transform: translateY(-3px); }
+
+    .file-label{ cursor:pointer; padding:8px 12px; border-radius:12px; background:rgba(255,255,255,0.03); }
+    .panel{
+      position:absolute; right:14px; bottom:82px; z-index:50; width:340px;
+      background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+      border-radius:14px; padding:12px; box-shadow:0 18px 60px rgba(0,0,0,0.55); backdrop-filter: blur(8px);
+      transition: opacity 220ms ease, transform 220ms ease, visibility 220ms;
+    }
+    .panel.hidden { opacity: 0; transform: translateY(8px); pointer-events: none; visibility: hidden; }
+    .panel.ui-hidden { opacity: 0; transform: translateY(8px); pointer-events: none; }
+
+    .panel h4{ margin:0 0 10px 0; color:var(--muted); font-size:14px; font-weight:700; }
+    .row{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin:8px 0; }
+    label.small{ font-size:12px; color: #dfe9ff; width:135px; }
+    input[type=range]{ width:100%; }
+    .small-note{ font-size:11px; color:rgba(255,255,255,0.6); margin-top:6px; }
+    .center-message{
+      position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:45;
+      background: rgba(255,255,255,0.03); padding:14px 18px; border-radius:12px; text-align:center;
+      border:1px solid rgba(255,255,255,0.04);
+    }
+
+    /* fullscreen-specific */
+    :fullscreen #visualizer { width:100vw; height:100vh; }
+
+    /* bottom text (if you add text) */
+    #bottomText {
+      position: absolute;
+      bottom: 58px; /* above preset bar */
+      width: 100%;
+      text-align: center;
+      color: black;
+      font-size: 18px;
+      font-weight: 600;
+      z-index: 100;
+      pointer-events: none;
+      text-shadow: 0 2px 6px rgba(255,255,255,0.02);
+    }
+
+    @media (max-width:720px){
+      .panel{ width: 92%; left:4%; right:4%; bottom:110px; }
+      .topbar{ left:8px; right:8px; top:10px; flex-direction:column; align-items:flex-start; gap:10px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="visualizer"></canvas>
+
+  <!-- topbar controls -->
+  <div class="topbar" id="topbar">
+    <head><h1><b>Audio Visualizer</b></h1></head>
+    <div style="display:flex;gap:12px;align-items:center">
+      <div class="controls" id="controlsBar" role="toolbar" aria-label="Playback controls">
+        <button class="btn selected" id="micBtn" title="Use microphone">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Mic
+        </button>
+
+        <button class="btn" id="speakerBtn" title="Use an audio file">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M11 5L6 9H2v6h4l5 4V5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Speaker
+        </button>
+
+        <label for="audioFile" id="fileLabel" class="file-label" style="display:none;">Choose Audio</label>
+        <input id="audioFile" type="file" accept="audio/*" style="display:none" />
+
+        <button id="stopBtn" class="btn" title="Stop visualizer">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="6" y="6" width="12" height="12" stroke="currentColor" stroke-width="1.5"/></svg>
+          Stop
+        </button>
+
+        <button id="fullscreenBtn" class="btn" title="Toggle Fullscreen">
+          <svg id="fsIcon" width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path d="M3 9V3h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M21 15v6h-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Fullscreen
+        </button>
+
+        <button id="togglePanel" class="btn" title="Show/Hide Controls">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 12h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          Hide Controls
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="message" class="center-message">Click 'Mic' to allow mic access or 'Speaker' to upload audio</div>
+  <audio id="audioElem" style="display:none"></audio>
+
+  <!-- bottom center preset bar -->
+  <div class="preset-bottom" id="presetBottom">
+    <button class="preset selected" id="preset0">Radial Bars</button>
+    <button class="preset" id="preset1">Classic Wave</button>
+    <button class="preset" id="preset2">Classic Bars</button>
+    <button class="preset" id="preset3">Spectrum Analyzer</button>
+    <button class="preset" id="preset4">Pulse Orb</button>
+  </div>
+
+  <!-- bottom text (optional) -->
+  <div id="bottomText" style="display:none">Your bottom centered black text here</div>
+
+  <div class="panel" id="panel">
+    <h4>Visualizer Controls</h4>
+
+    <div class="row">
+      <label class="small">Sensitivity</label>
+      <input id="sensitivity" type="range" min="0.4" max="5.0" step="0.1" value="1.0" />
+    </div>
+
+    <div id="radialOptions" style="display:block">
+      <div class="row">
+        <label class="small">Radial Bars Count</label>
+        <input id="barsCount" type="range" min="12" max="160" step="2" value="86" />
+      </div>
+      <div class="row">
+        <label class="small">Radial Spread</label>
+        <input id="radialSpread" type="range" min="0.2" max="1.6" step="0.05" value="1.0" />
+      </div>
+    </div>
+
+    <div id="classicOptions" style="display:none">
+      <div class="row">
+        <label class="small">Wave Amplitude</label>
+        <input id="waveAmp" type="range" min="0.5" max="5.0" step="0.1" value="1.8" />
+      </div>
+      <div class="row">
+        <label class="small">Wave Lines</label>
+        <input id="waveLines" type="range" min="1" max="6" step="1" value="3" />
+      </div>
+    </div>
+
+    <div id="barsOptions" style="display:none">
+      <div class="row">
+        <label class="small">Bars Count</label>
+        <input id="classicBarsCount" type="range" min="8" max="160" step="2" value="64" />
+      </div>
+      <div class="row">
+        <label class="small">Bars Width</label>
+        <input id="classicBarsWidth" type="range" min="1" max="24" step="1" value="6" />
+      </div>
+    </div>
+
+    <div id="pulseOptions" style="display:none">
+      <div class="row">
+        <label class="small">Orb Size</label>
+        <input id="orbSize" type="range" min="30" max="220" step="2" value="80" />
+      </div>
+      <div class="row">
+        <label class="small">Glow Intensity</label>
+        <input id="orbGlow" type="range" min="0" max="80" step="2" value="36" />
+      </div>
+    </div>
+
+    <div class="row">
+      <label class="small">Color Mode</label>
+      <select id="colorMode" style="padding:6px 8px; border-radius:8px; background:transparent;">
+        <option value="hue">Hue Cycle</option>
+        <option value="pastel">Pastel Blend</option>
+        <option value="neon">Neon Bright</option>
+      </select>
+    </div>
+
+    <div class="row">
+      <label class="small">Monitor Mic</label>
+      <input id="monitorMic" type="checkbox" />
+    </div>
+
+    <div class="small-note">New presets added: Classic Bars, Spectrum Analyzer, Pulse Orb. Use headphones to avoid feedback.</div>
+  </div>
+
+<script>
+/* ---------- canvas & resize ---------- */
+const canvas = document.getElementById('visualizer');
+const ctx = canvas.getContext('2d', { alpha: true });
+let W = innerWidth, H = innerHeight;
+function resize() { W = innerWidth; H = innerHeight; canvas.width = W; canvas.height = H; }
+resize(); addEventListener('resize', resize);
+
+/* ---------- DOM references ---------- */
+const message = document.getElementById('message');
+const audioElem = document.getElementById('audioElem');
+const micBtn = document.getElementById('micBtn');
+const speakerBtn = document.getElementById('speakerBtn');
+const fileLabel = document.getElementById('fileLabel');
+const audioFile = document.getElementById('audioFile');
+const presetEls = [
+  document.getElementById('preset0'),
+  document.getElementById('preset1'),
+  document.getElementById('preset2'),
+  document.getElementById('preset3'),
+  document.getElementById('preset4')
+];
+const stopBtn = document.getElementById('stopBtn');
+const togglePanelBtn = document.getElementById('togglePanel');
+const fullscreenBtn = document.getElementById('fullscreenBtn');
+const fsIcon = document.getElementById('fsIcon');
+
+const topbar = document.getElementById('topbar');
+const controlsBar = document.getElementById('controlsBar');
+const panel = document.getElementById('panel');
+const radialOptions = document.getElementById('radialOptions');
+const classicOptions = document.getElementById('classicOptions');
+const barsOptions = document.getElementById('barsOptions');
+const pulseOptions = document.getElementById('pulseOptions');
+
+const sensitivityEl = document.getElementById('sensitivity');
+const barsCountEl = document.getElementById('barsCount');
+const radialSpreadEl = document.getElementById('radialSpread');
+const waveAmpEl = document.getElementById('waveAmp');
+const waveLinesEl = document.getElementById('waveLines');
+const classicBarsCountEl = document.getElementById('classicBarsCount');
+const classicBarsWidthEl = document.getElementById('classicBarsWidth');
+const orbSizeEl = document.getElementById('orbSize');
+const orbGlowEl = document.getElementById('orbGlow');
+
+const colorModeEl = document.getElementById('colorMode');
+const monitorMicEl = document.getElementById('monitorMic');
+const bottomText = document.getElementById('bottomText');
+
+let audioCtx = null;
+let analyser = null;
+let outputGain = null;
+let currentSource = null;
+let mediaStream = null;
+let raf = null;
+let bufferLength = 0;
+let dataArray = null;
+let running = false;
+let activePreset = 0; // 0 radial,1 classicWave,2 classicBars,3 spectrum,4 pulse
+let sensitivity = parseFloat(sensitivityEl.value);
+
+/* ---------- ensure audio nodes ---------- */
+async function ensureAudioContextAndNodes(){
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    outputGain = audioCtx.createGain();
+    outputGain.gain.value = 0;
+    outputGain.connect(audioCtx.destination);
+  }
+  if (!analyser) {
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    bufferLength = analyser.frequencyBinCount;
+    dataArray = new Uint8Array(bufferLength);
+  }
+}
+
+/* ---------- attach source ---------- */
+function attachSource(node) {
+  if (!audioCtx) return;
+  if (!analyser) {
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+  }
+  if (currentSource) try { currentSource.disconnect(); } catch(e){}
+  currentSource = node;
+  node.connect(analyser);
+  analyser.connect(outputGain);
+  bufferLength = analyser.frequencyBinCount;
+  dataArray = new Uint8Array(bufferLength);
+}
+
+/* ---------- preset UI & options visibility ---------- */
+function updatePresetUI(idx) {
+  presetEls.forEach((el,i)=>el.classList.toggle('selected', i===idx));
+  activePreset = idx;
+  radialOptions.style.display = (idx===0) ? 'block' : 'none';
+  classicOptions.style.display = (idx===1) ? 'block' : 'none';
+  barsOptions.style.display = (idx===2) ? 'block' : 'none';
+  pulseOptions.style.display = (idx===4) ? 'block' : 'none';
+  message.style.display = 'none';
+}
+presetEls.forEach((el,i)=>el.onclick = ()=>updatePresetUI(i));
+
+/* ---------- mode selection ---------- */
+micBtn.onclick = ()=>selectMode('mic');
+speakerBtn.onclick = ()=>selectMode('speaker');
+fileLabel.onclick = ()=>audioFile.click();
+
+function selectMode(m){
+  if (m === 'mic') {
+    micBtn.classList.add('selected'); speakerBtn.classList.remove('selected');
+    fileLabel.style.display = 'none';
+  } else {
+    speakerBtn.classList.add('selected'); micBtn.classList.remove('selected');
+    fileLabel.style.display = 'inline-block';
+  }
+  stopAll();
+  message.innerHTML = m === 'mic' ? "Click 'Mic' to allow mic access or pick Speaker" : "Choose an audio file to play";
+  message.style.display = 'block';
+}
+
+/* ---------- start mic ---------- */
+async function startMic(){
+  try {
+    await ensureAudioContextAndNodes();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('getUserMedia not supported');
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio:true, video:false });
+    const src = audioCtx.createMediaStreamSource(mediaStream);
+    attachSource(src);
+    outputGain.gain.value = monitorMicEl.checked ? 1 : 0;
+    running = true;
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+    startLoop();
+    message.style.display = 'none';
+  } catch (err){
+    console.error(err);
+    message.innerText = 'Unable to access microphone. Check permissions.';
+    message.style.display = 'block';
+  }
+}
+
+/* ---------- start file playback ---------- */
+function startFilePlayback(file){
+  if (!file) return;
+  stopAll();
+  const url = URL.createObjectURL(file);
+  audioElem.src = url;
+  audioElem.crossOrigin = 'anonymous';
+  audioElem.play().catch(()=>{ /* gesture may be required */});
+  ensureAudioContextAndNodes().then(()=>{
+    const src = audioCtx.createMediaElementSource(audioElem);
+    attachSource(src);
+    outputGain.gain.value = 1;
+    running = true;
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    startLoop();
+    message.style.display = 'none';
+  }).catch(err=>{
+    console.error(err);
+    message.innerText = 'Could not start file playback.';
+    message.style.display = 'block';
+  });
+}
+
+/* ---------- stop/cleanup ---------- */
+function stopAll(){
+  running = false;
+  if (raf) { cancelAnimationFrame(raf); raf = null; }
+  if (analyser) { try{ analyser.disconnect(); } catch(e){} analyser = null; }
+  if (currentSource) { try{ currentSource.disconnect(); } catch(e){} currentSource = null; }
+  if (mediaStream) { mediaStream.getTracks().forEach(t=>t.stop()); mediaStream = null; }
+  if (audioElem && !audioElem.paused) { try{ audioElem.pause(); audioElem.currentTime = 0; } catch(e){} }
+}
+
+/* ---------- color helper ---------- */
+function hueFor(index, t){
+  const mode = colorModeEl.value;
+  if (mode === 'hue') return (index + t/24) % 360;
+  if (mode === 'pastel') return (200 + index/4 + (t/120)) % 360;
+  return (index*3 + (t/6)) % 360; // neon
+}
+
+/* ---------- renderer: radialBars (kept) ---------- */
+function radialBars(arr, t){
+  ctx.clearRect(0,0,W,H);
+  const bars = parseInt(barsCountEl.value,10) || 86;
+  const cx = W/2, cy = H/2;
+  const r = Math.min(W,H)/4.8 * parseFloat(radialSpreadEl.value);
+  const twoPI = Math.PI*2;
+  for (let i=0;i<bars;i++){
+    const angle = i*twoPI/bars;
+    const idx = Math.floor((i/bars)*arr.length);
+    const value = ((arr[idx]||0) / sensitivity) / 2;
+    const hue = hueFor(i*260/bars, t);
+    const barLen = r + 45 + value + Math.sin(angle*7 + t/400)*11;
+    ctx.save();
+    ctx.strokeStyle = `hsl(${hue}, 98%, 62%)`;
+    ctx.lineWidth = Math.max(2, 6.1 + value/70);
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(angle)*r, cy + Math.sin(angle)*r);
+    ctx.lineTo(cx + Math.cos(angle)*barLen, cy + Math.sin(angle)*barLen);
+    ctx.shadowColor = `hsl(${hue}, 95%, 90%)`;
+    ctx.shadowBlur = 18;
+    ctx.stroke();
+    ctx.restore();
+  }
+  // pulse
+  ctx.save();
+  const pulse = Math.abs(Math.sin(t/230))*29 + ((arr[10]||0)/sensitivity)/5;
+  ctx.beginPath();
+  ctx.arc(W/2, H/2, r+19+pulse, 0, Math.PI*2);
+  ctx.strokeStyle = `hsla(${hueFor(t/9,t)%360},96%,40%,0.14)`;
+  ctx.lineWidth = 16;
+  ctx.shadowColor = `hsla(${hueFor(t/11,t)%360},85%,50%,0.16)`;
+  ctx.shadowBlur = 44;
+  ctx.stroke();
+  ctx.restore();
+}
+
+/* ---------- renderer: classicWave (kept) ---------- */
+function classicWave(arr, t){
+  ctx.clearRect(0,0,W,H);
+  const mid = H/2, spread = W*0.76, left = (W-spread)/2;
+  const lines = parseInt(waveLinesEl.value,10) || 3;
+  const amp = parseFloat(waveAmpEl.value) || 1.8;
+  for (let j=0;j<lines;j++){
+    ctx.beginPath();
+    for (let i=0;i<arr.length;i++){
+      const x = left + (i/arr.length)*spread;
+      const a = ((arr[i]||0)/sensitivity) / 2;
+      const y = mid - (a*amp + j*12) * Math.sin(Math.PI*2 * (i/arr.length) + t/800 + j/2);
+      if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    const hue = hueFor(t/7 + j*80, t);
+    ctx.strokeStyle = `hsla(${hue},56%,78%,0.9)`;
+    ctx.lineWidth = 3.5 + j;
+    ctx.shadowColor = `hsla(${(hue+40)%360},75%,72%,0.66)`;
+    ctx.shadowBlur = 16;
+    ctx.stroke();
+  }
+}
+
+/* ---------- NEW renderer: Classic Bars (vertical bars) ---------- */
+function classicBars(arr, t) {
+  ctx.clearRect(0, 0, W, H);
+  const count = parseInt(classicBarsCountEl.value, 10) || 64;
+  const barW = parseInt(classicBarsWidthEl.value, 10) || 6;
+  const gap = Math.max(1, (W - (count * barW)) / (count + 1));
+  for (let i = 0; i < count; i++) {
+    const idx = Math.floor((i / count) * arr.length);
+    const val = (arr[idx] || 0) / sensitivity;
+    const h = (val / 255) * (H * 0.6);
+    const x = Math.round(gap + i * (barW + gap));
+    const hue = hueFor(i * 300 / count, t);
+    ctx.save();
+    // gradient fill for bar
+    const g = ctx.createLinearGradient(x, H - h, x, H);
+    g.addColorStop(0, `hsla(${hue},90%,70%,0.95)`);
+    g.addColorStop(1, `hsla(${(hue + 40) % 360},80%,45%,0.95)`);
+    ctx.fillStyle = g;
+    // shadow
+    ctx.shadowColor = `hsla(${hue},90%,70%,0.45)`;
+    ctx.shadowBlur = 12;
+    ctx.fillRect(x, H - h, barW, h);
+    ctx.restore();
+  }
+}
+
+/* ---------- NEW renderer: Spectrum Analyzer (smooth bands) ---------- */
+function spectrumAnalyzer(arr, t) {
+  ctx.clearRect(0, 0, W, H);
+  const bands = 128;
+  const bandWidth = W / bands;
+  for (let i = 0; i < bands; i++) {
+    const idx = Math.floor((i / bands) * arr.length);
+    const val = (arr[idx] || 0) / sensitivity;
+    const h = (val / 255) * (H * 0.7);
+    const x = i * bandWidth;
+    const hue = hueFor(i * 2 + t / 30, t);
+    ctx.save();
+    ctx.fillStyle = `hsl(${hue}, 95%, 60%)`;
+    ctx.globalAlpha = 0.95;
+    ctx.fillRect(x, H - h, bandWidth * 0.92, h);
+    // small top glow
+    ctx.fillStyle = `hsla(${hue},95%,86%,0.12)`;
+    ctx.fillRect(x, H - h - 6, bandWidth * 0.92, 6);
+    ctx.restore();
+  }
+}
+
+/* ---------- NEW renderer: Pulse Orb (glowing orb reacting to bass) ---------- */
+function pulseOrb(arr, t) {
+  ctx.clearRect(0, 0, W, H);
+  // use lower frequencies for bass energy
+  const bassCount = 16;
+  let sum = 0;
+  for (let i = 0; i < bassCount; i++) sum += (arr[i] || 0);
+  const avg = sum / bassCount;
+  const normalized = (avg / 255) / sensitivity;
+  const baseRadius = parseInt(orbSizeEl.value, 10) || 80;
+  const radius = baseRadius + normalized * 280 + Math.sin(t / 300) * 8;
+  const cx = W / 2, cy = H / 2;
+  const hue = hueFor(t / 6, t);
+  // glow layers
+  for (let i = 6; i >= 1; i--) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius + i * 8, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${hue},95%,60%,${0.02 * (i)})`;
+    ctx.fill();
+  }
+  // inner orb
+  ctx.beginPath();
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius * 1.2);
+  g.addColorStop(0, `hsla(${hue},95%,85%,1)`);
+  g.addColorStop(0.5, `hsla(${(hue + 40) % 360},95%,55%,0.9)`);
+  g.addColorStop(1, `hsla(${(hue + 80) % 360},95%,40%,0.02)`);
+  ctx.fillStyle = g;
+  ctx.shadowColor = `hsla(${hue},95%,75%,0.9)`;
+  ctx.shadowBlur = parseInt(orbGlowEl.value, 10) || 36;
+  ctx.fillRect(cx - radius * 1.2, cy - radius * 1.2, radius * 2.4, radius * 2.4);
+  // small center highlight
+  ctx.beginPath();
+  ctx.arc(cx, cy, Math.max(6, radius * 0.12), 0, Math.PI * 2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+}
+
+/* ---------- main loop ---------- */
+function startLoop(){
+  function frame(now){
+    if (!running || !analyser) { ctx.clearRect(0,0,W,H); return; }
+    analyser.getByteFrequencyData(dataArray);
+    const t = now;
+    try {
+      if (activePreset === 0) radialBars(dataArray, t);
+      else if (activePreset === 1) classicWave(dataArray, t);
+      else if (activePreset === 2) classicBars(dataArray, t);
+      else if (activePreset === 3) spectrumAnalyzer(dataArray, t);
+      else pulseOrb(dataArray, t);
+    } catch (e) { console.error('render', e); }
+    raf = requestAnimationFrame(frame);
+  }
+  if (raf) cancelAnimationFrame(raf);
+  raf = requestAnimationFrame(frame);
+}
+
+/* ---------- UI event wiring ---------- */
+audioFile.addEventListener('change', (e)=> {
+  const f = e.target.files && e.target.files[0];
+  if (f) {
+    selectMode('speaker');
+    startFilePlayback(f);
+  }
+});
+
+stopBtn.addEventListener('click', ()=>{
+  stopAll();
+  message.style.display = 'block';
+  message.innerText = "Stopped. Choose Mic or Speaker to restart.";
+});
+
+micBtn.addEventListener('click', async ()=>{
+  selectMode('mic');
+  await startMic();
+});
+
+speakerBtn.addEventListener('click', ()=>{
+  selectMode('speaker');
+  if (!audioFile.files.length) fileLabel.click();
+  else startFilePlayback(audioFile.files[0]);
+});
+
+sensitivityEl.addEventListener('input', ()=> sensitivity = parseFloat(sensitivityEl.value));
+barsCountEl.addEventListener('input', ()=> {});
+radialSpreadEl.addEventListener('input', ()=> {});
+waveAmpEl.addEventListener('input', ()=> {});
+waveLinesEl.addEventListener('input', ()=> {});
+classicBarsCountEl.addEventListener('input', ()=> {});
+classicBarsWidthEl.addEventListener('input', ()=> {});
+orbSizeEl.addEventListener('input', ()=> {});
+orbGlowEl.addEventListener('input', ()=> {});
+colorModeEl.addEventListener('change', ()=> {});
+monitorMicEl.addEventListener('change', ()=>{
+  if (outputGain) outputGain.gain.value = monitorMicEl.checked ? 1 : 0;
+});
+
+/* ---------- toggle panel (hide/show) with persistence ---------- */
+togglePanelBtn.textContent = 'Hide Controls';
+togglePanelBtn.addEventListener('click', () => {
+  const isHidden = panel.classList.toggle('hidden');
+  if (isHidden) {
+    togglePanelBtn.textContent = 'Show Controls';
+    togglePanelBtn.classList.remove('selected');
+    panel.setAttribute('aria-hidden', 'true');
+    try { localStorage.setItem('viz_panel_hidden', '1'); } catch(e) {}
+  } else {
+    togglePanelBtn.textContent = 'Hide Controls';
+    togglePanelBtn.classList.add('selected');
+    panel.setAttribute('aria-hidden', 'false');
+    try { localStorage.removeItem('viz_panel_hidden'); } catch(e) {}
+  }
+});
+// restore previous state on load
+try {
+  if (localStorage.getItem('viz_panel_hidden') === '1') {
+    panel.classList.add('hidden');
+    togglePanelBtn.textContent = 'Show Controls';
+    togglePanelBtn.classList.remove('selected');
+    panel.setAttribute('aria-hidden', 'true');
+  } else {
+    panel.classList.remove('hidden');
+    togglePanelBtn.textContent = 'Hide Controls';
+    togglePanelBtn.classList.add('selected');
+    panel.setAttribute('aria-hidden', 'false');
+  }
+} catch(e) {}
+
+/* ---------- Fullscreen logic & UI auto-hide ---------- */
+const HIDE_TIMEOUT = 2500; // ms
+let hideTimer = null;
+
+function setHideTimer() {
+  clearHideTimer();
+  if (!document.fullscreenElement) return;
+  hideTimer = setTimeout(()=> {
+    topbar.classList.add('ui-hidden');
+    panel.classList.add('ui-hidden');
+    controlsBar.classList.add('ui-hidden');
+    document.getElementById('presetBottom').style.opacity = '0.08';
+  }, HIDE_TIMEOUT);
+}
+function clearHideTimer() {
+  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+  topbar.classList.remove('ui-hidden');
+  panel.classList.remove('ui-hidden');
+  controlsBar.classList.remove('ui-hidden');
+  document.getElementById('presetBottom').style.opacity = '1';
+}
+
+fullscreenBtn.addEventListener('click', async () => {
+  try {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen();
+      fullscreenBtn.classList.add('selected');
+      setHideTimer();
+    } else {
+      await document.exitFullscreen();
+      fullscreenBtn.classList.remove('selected');
+      clearHideTimer();
+    }
+  } catch (err) {
+    console.warn('Fullscreen error', err);
+  }
+});
+
+['mousemove','touchstart','keydown','pointermove'].forEach(ev => {
+  document.addEventListener(ev, () => {
+    if (document.fullscreenElement) {
+      clearHideTimer();
+      setHideTimer();
+    }
+  }, { passive: true });
+});
+
+document.addEventListener('fullscreenchange', () => {
+  resize();
+  if (!document.fullscreenElement) clearHideTimer(); else setHideTimer();
+});
+
+/* ---------- start & init ---------- */
+(async function init(){
+  updatePresetUI(0);
+  message.style.display = 'block';
+  // restore panel hidden state already handled
+})();
+
+window.addEventListener('beforeunload', ()=>{ stopAll(); try{ if (audioCtx) audioCtx.close(); }catch(e){} });
+</script>
+</body>
+</html>
