@@ -1,10 +1,10 @@
-# Audio Visualizer
-
+# 🎶 Audio Visualizer
+---
 A responsive browser visualizer that reacts to microphone or audio file input and displays real-time RGB visual effects (radial bars, classic waves, bars, spectrum and pulse orb). Built with plain JavaScript, Canvas API and the Web Audio API.
 
 ---
 
-## Features
+## ✨ Features
 
 - Realtime mic input or upload an audio file  
 - Multiple presets: **Radial Bars**, **Classic Wave**, **Classic Bars**, **Spectrum Analyzer**, **Pulse Orb**  
@@ -14,3 +14,4 @@ A responsive browser visualizer that reacts to microphone or audio file input an
 - Lightweight — single HTML file; no build step required
 
 ---
+## 🔗Link🔗
