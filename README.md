@@ -14,7 +14,8 @@ A responsive browser visualizer that reacts to microphone or audio file input an
 - Lightweight — single HTML file; no build step required
 
 ---
-## 🔗Link🔗
-https://rumman-07.github.io/Audio-Visualizer/
----
-https://audiovisualizer07.netlify.app/
+## 🔗Link🔗 
+
+### https://rumman-07.github.io/Audio-Visualizer/
+or
+### https://audiovisualizer07.netlify.app/
